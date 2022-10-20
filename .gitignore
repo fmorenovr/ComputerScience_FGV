@@ -4,9 +4,12 @@
 __pycache__/
 
 # Data 
-/data/
-/years/
-/drafts/
+#/data/
+dataset/
+years/
+drafts/
 outputs/
 graphs/
-/*.zip
+*.zip
+*.h5
+*.pth
