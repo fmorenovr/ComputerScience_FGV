@@ -71,6 +71,7 @@ dependencies:
     - ipywidgets==8.0.3
     - jedi==0.18.2
     - jinja2==3.1.2
+    - joblib==1.2.0
     - jsonschema==4.17.3
     - jupyter==1.0.0
     - jupyter-client==7.4.8
@@ -142,6 +143,7 @@ dependencies:
     - rsa==4.9
     - sahi==0.11.6
     - scikit-image==0.19.3
+    - scikit-learn==1.0.2
     - scipy==1.4.1
     - send2trash==1.8.0
     - shapely==2.0.0
@@ -157,6 +159,7 @@ dependencies:
     - termcolor==2.1.1
     - terminado==0.17.1
     - terminaltables==3.1.10
+    - threadpoolctl==3.1.0
     - tifffile==2021.11.2
     - tinycss2==1.2.1
     - tomli==2.0.1
