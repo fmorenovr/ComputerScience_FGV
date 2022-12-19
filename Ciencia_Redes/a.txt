@@ -1,9 +1,0 @@
-+ Check viability of power-laws. 
-+ Explicitly identify asymmetric nodes. 
-+ Use Price's model to generate a random graph. 
-+ Evaluate an equivalent measure to the PIB's contribution for each player within the market. 
-+ Evaluate the algorithms in dummy networks. 
-
-+ Generate the images that should be introduced 
-+ Identify the nodes therein
-+ Check general, yet endowed with purpose, properties of the graphs 
