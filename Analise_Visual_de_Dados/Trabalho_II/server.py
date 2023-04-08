@@ -11,7 +11,7 @@ import math
 
 # create Flask app
 app = Flask(__name__)
-#CORS(app)
+CORS(app)
 
 # --- these will be populated in the main --- #
 
