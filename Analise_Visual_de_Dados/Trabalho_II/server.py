@@ -10,38 +10,55 @@ from flask_cors import CORS
 import math
 
 from scipy.spatial import distance 
+from sklearn.cluster import KMeans
 
 # create Flask app
 app = Flask(__name__)
 CORS(app)
+#CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # --- these will be populated in the main --- #
-def kmeans(x,k, no_of_iterations):
-    idx = np.random.choice(len(x), k, replace=False)
-    #Step-1: Randomly choosing Centroids 
-    centroids = x[idx, :] 
+def ccPCA(data, targets , n_components=2):
      
-    #Step-2: Finding the distance between centroids and all the data points
-    distances = distance.cdist(x, centroids ,'euclidean') 
+     X = [X == target_label]
+     R = X[X != target_label]
+    #Step-1: concat
+    
      
-    #Step-3: Centroid with the minimum Distance
-    points = np.array([np.argmin(i) for i in distances]) 
+    #Step-1
+    X_meaned = X - np.mean(X , axis = 0)
      
-    #Repeating the above steps for a defined number of iterations
-    #Step 4
-    for _ in range(no_of_iterations): 
-        centroids = []
-        for idx in range(k):
-            #Updating Centroids by taking mean of Cluster it belongs to
-            temp_cent = x[points==idx].mean(axis=0) 
-            centroids.append(temp_cent)
- 
-        centroids = np.vstack(centroids) #Updated Centroids 
-         
-        distances = distance.cdist(x, centroids ,'euclidean')
-        points = np.array([np.argmin(i) for i in distances])
-         
-    return points 
+    #Step-2
+    cov_mat = np.cov(X_meaned , rowvar = False)
+     
+    #Step-3
+    _, sigmas, __ = np.linalg.svd(X_meaned)
+
+    eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
+     
+    #Step-4
+    sorted_index = np.argsort(eigen_values)[::-1]
+    sorted_eigenvalue = eigen_values[sorted_index]
+    sorted_eigenvectors = eigen_vectors[:,sorted_index]
+     
+    #Step-5_A: components
+    pca_components = sorted_eigenvectors[:,0:n_components]
+    #print("sratch components:", pca_components)
+   
+    #Step-5_B: Explained variances
+    #explained_variances_ratios = [value / np.sum(sorted_eigenvalue) for value in sorted_eigenvalue]
+    explained_variances = sorted_eigenvalue[0:n_components]
+
+    #Step-5_C: Sigmas
+    singular_values = sigmas[0:n_components]
+     
+    #Step-6: Projections
+    X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    
+    #Step-7: Loadings
+    loadings = pca_components*singular_values
+
+    return X_reduced, loadings
 
 def PCA(X , n_components=2):
      
@@ -91,6 +108,8 @@ episode_names=json.load(open('episode_names.json','r'))
 
 # a list of painting image URLs of size n
 painting_image_urls=json.load(open('painting_image_urls.json','r'))
+
+print(painting_attributes, painting_attributes.shape)
 
 '''
 This will return an array of strings containing the episode names -> these should be displayed upon hovering over circles.
@@ -150,7 +169,20 @@ TODO: run kmeans on painting_attributes, returning data in the same format as in
 '''
 @app.route('/kmeans', methods=['GET'])
 def kmeans():
-    pass
+    kmeans = KMeans(n_clusters=6, random_state=0, init="random").fit(painting_attributes)
+    labels = kmeans.labels_
+    print(labels, labels.shape)
+    
+    kmeans_data = []
+    
+    for i in range(len(painting_attributes)):
+        for j, att in enumerate(attribute_names):
+            kmeans_data.append({"attribute": att, 
+                                "id": i, 
+                                "label": int(labels[i]), 
+                                "value": int(painting_attributes[i][j])})
+        
+    return flask.jsonify(kmeans_data)
 #
 
 if __name__=='__main__':

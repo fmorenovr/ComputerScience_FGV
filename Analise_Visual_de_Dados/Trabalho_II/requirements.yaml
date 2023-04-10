@@ -1,4 +1,4 @@
-name: server_II
+name: server_avd
 channels:
   - anaconda
   - defaults
