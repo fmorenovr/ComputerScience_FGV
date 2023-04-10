@@ -9,28 +9,93 @@ from flask import Flask
 from flask_cors import CORS
 import math
 
+from scipy.spatial import distance 
+
 # create Flask app
 app = Flask(__name__)
 CORS(app)
 
 # --- these will be populated in the main --- #
+def kmeans(x,k, no_of_iterations):
+    idx = np.random.choice(len(x), k, replace=False)
+    #Step-1: Randomly choosing Centroids 
+    centroids = x[idx, :] 
+     
+    #Step-2: Finding the distance between centroids and all the data points
+    distances = distance.cdist(x, centroids ,'euclidean') 
+     
+    #Step-3: Centroid with the minimum Distance
+    points = np.array([np.argmin(i) for i in distances]) 
+     
+    #Repeating the above steps for a defined number of iterations
+    #Step 4
+    for _ in range(no_of_iterations): 
+        centroids = []
+        for idx in range(k):
+            #Updating Centroids by taking mean of Cluster it belongs to
+            temp_cent = x[points==idx].mean(axis=0) 
+            centroids.append(temp_cent)
+ 
+        centroids = np.vstack(centroids) #Updated Centroids 
+         
+        distances = distance.cdist(x, centroids ,'euclidean')
+        points = np.array([np.argmin(i) for i in distances])
+         
+    return points 
+
+def PCA(X , n_components=2):
+     
+    #Step-1
+    X_meaned = X - np.mean(X , axis = 0)
+     
+    #Step-2
+    cov_mat = np.cov(X_meaned , rowvar = False)
+     
+    #Step-3
+    _, sigmas, __ = np.linalg.svd(X_meaned)
+
+    eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
+     
+    #Step-4
+    sorted_index = np.argsort(eigen_values)[::-1]
+    sorted_eigenvalue = eigen_values[sorted_index]
+    sorted_eigenvectors = eigen_vectors[:,sorted_index]
+     
+    #Step-5_A: components
+    pca_components = sorted_eigenvectors[:,0:n_components]
+    #print("sratch components:", pca_components)
+   
+    #Step-5_B: Explained variances
+    #explained_variances_ratios = [value / np.sum(sorted_eigenvalue) for value in sorted_eigenvalue]
+    explained_variances = sorted_eigenvalue[0:n_components]
+
+    #Step-5_C: Sigmas
+    singular_values = sigmas[0:n_components]
+     
+    #Step-6: Projections
+    X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    
+    #Step-7: Loadings
+    loadings = pca_components*singular_values
+
+    return X_reduced, loadings
 
 # list of attribute names of size m
-attribute_names=None
+attribute_names=json.load(open('attribute_names.json','r'))
 
 # a 2D numpy array containing binary attributes - it is of size n x m, for n paintings and m attributes
-painting_attributes=None
+painting_attributes=np.load('painting_attributes.npy')
 
 # a list of epsiode names of size n
-episode_names=None
+episode_names=json.load(open('episode_names.json','r'))
 
 # a list of painting image URLs of size n
-painting_image_urls=None
+painting_image_urls=json.load(open('painting_image_urls.json','r'))
 
 '''
 This will return an array of strings containing the episode names -> these should be displayed upon hovering over circles.
 '''
-@app.route('/get_episode_names/', methods=['GET'])
+@app.route('/get_episode_names', methods=['GET'])
 def get_episode_names():
     return flask.jsonify(episode_names)
 #
@@ -51,7 +116,19 @@ TODO: implement PCA, this should return data in the same format as you saw in th
 '''
 @app.route('/initial_pca', methods=['GET'])
 def initial_pca():
-    pass
+    #pca = decomposition.PCA(n_components=2, svd_solver='full')
+    #new_attributes = pca.fit_transform(painting_attributes)
+    #loadings_ = pca.components_.T* pca.singular_values_
+    #print("sklearn.PCA components", pca.components_.T)
+    #print("sklearn PCA exxplain variance", pca.explained_variance_)
+    #new_attributes[:,0] = -1*new_attributes[:,0]
+    #print("singular_val", pca.singular_values_)
+    #print("sklearn PCA loadings", loadings_)
+    new_projection, loadings = PCA(painting_attributes, n_components=2)
+    x_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,0].copy()) ] 
+    y_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,1].copy()) ] 
+
+    return flask.jsonify({"loading_x": x_loadings, "loading_y":y_loadings, "projection": new_projection.tolist()})
 #
 
 '''
@@ -77,10 +154,6 @@ def kmeans():
 #
 
 if __name__=='__main__':
-    painting_image_urls = json.load(open('painting_image_urls.json','r'))
-    attribute_names = json.load(open('attribute_names.json','r'))
-    episode_names = json.load(open('episode_names.json','r'))
-    painting_attributes = np.load('painting_attributes.npy')
 
     app.run()
 #
