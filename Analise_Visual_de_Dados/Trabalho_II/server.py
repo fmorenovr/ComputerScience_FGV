@@ -21,49 +21,58 @@ targets = None;
 #CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # --- these will be populated in the main --- #
-def ccPCA(data, targets , n_components=2):
+def ccPCA(data, targets , n_components=2, alpha=0.5):
      
     X = data.copy()
     X = np.delete(data, targets, axis=0)
     R = data[targets]
     #Step-1: concat
     concatMat = np.concatenate((X, R), axis=0)
-    print(concatMat.shape)
-     
-    #Step-1
-    #X_meaned = X - np.mean(X , axis = 0)
-     
-    #Step-2
-    #cov_mat = np.cov(X_meaned , rowvar = False)
-     
-    #Step-3
-    #_, sigmas, __ = np.linalg.svd(X_meaned)
+    print(X.shape, R.shape, concatMat.shape)
 
-    #eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
+    #applying ccPCA
+    concatMat_meaned = X - np.mean(X, axis = 0)
+    R_meaned = R - np.mean(R, axis = 0)
+    print(concatMat_meaned.shape, R_meaned.shape)
+
+    #Step-2: Covarianza
+    #final_matrix = concatMat_meaned - alpha*R_meaned
+    cov_mat_X = np.cov(concatMat_meaned , rowvar = False)
+    cov_mat_R = np.cov(R_meaned , rowvar = False)
+    print(cov_mat_X.shape, cov_mat_R.shape)
+    #print(cov_mat.shape)
+    #X_meaned = X - np.mean(X , axis = 0)
+
+    final_matrix = cov_mat_X - alpha*cov_mat_R
+    cov_mat = np.cov(final_matrix , rowvar = False)
+
+    #Step-3: eigen solver
+    eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
+    _, sigmas, __ = np.linalg.svd(cov_mat)
      
     #Step-4
-    #sorted_index = np.argsort(eigen_values)[::-1]
-    #sorted_eigenvalue = eigen_values[sorted_index]
-    #sorted_eigenvectors = eigen_vectors[:,sorted_index]
+    sorted_index = np.argsort(eigen_values)[::-1]
+    sorted_eigenvalue = eigen_values[sorted_index]
+    sorted_eigenvectors = eigen_vectors[:,sorted_index]
      
     #Step-5_A: components
-    #pca_components = sorted_eigenvectors[:,0:n_components]
+    pca_components = sorted_eigenvectors[:,0:n_components]
     #print("sratch components:", pca_components)
    
     #Step-5_B: Explained variances
     #explained_variances_ratios = [value / np.sum(sorted_eigenvalue) for value in sorted_eigenvalue]
-    #explained_variances = sorted_eigenvalue[0:n_components]
+    explained_variances = sorted_eigenvalue[0:n_components]
 
     #Step-5_C: Sigmas
-    #singular_values = sigmas[0:n_components]
+    singular_values = sigmas[0:n_components]
      
     #Step-6: Projections
-    #X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    X_reduced = np.dot(pca_components.transpose() , final_matrix.transpose() ).transpose()
     
     #Step-7: Loadings
-    #loadings = pca_components*singular_values
+    loadings = pca_components*singular_values
 
-    return X, R
+    return X_reduced, loadings
 
 def PCA(X , n_components=2):
      
@@ -170,14 +179,17 @@ def ccpca():
         except Exception as e:
             print(e)
         
-        X, R = ccPCA(painting_attributes, targets)
-        print(X.shape, R.shape)
+        new_projection, loadings = ccPCA(painting_attributes, targets)
+        print(request.method, new_projection.shape, loadings.shape)
     
     if request.method == "GET":
-        X, R = ccPCA(painting_attributes, targets)
-        print(X.shape, R.shape)
+        new_projection, loadings = ccPCA(painting_attributes, targets)
+        print(request.method, new_projection.shape, loadings.shape)
+        
+    x_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,0].copy()) ] 
+    y_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,1].copy()) ]
 
-    return flask.jsonify({"loading_x": [], "loading_y":[], "projection": []})
+    return flask.jsonify({"loading_x": x_loadings, "loading_y": y_loadings, "projection": new_projection.tolist()})
 #
 
 '''
