@@ -5,60 +5,65 @@ import argparse
 import json
 import csv
 
-from flask import Flask
+from flask import Flask, request
+from flask_restful import reqparse
 from flask_cors import CORS
 import math
 
-from scipy.spatial import distance 
 from sklearn.cluster import KMeans
 
 # create Flask app
 app = Flask(__name__)
 CORS(app)
+
+targets = None;
+
 #CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # --- these will be populated in the main --- #
 def ccPCA(data, targets , n_components=2):
      
-     X = [X == target_label]
-     R = X[X != target_label]
+    X = data.copy()
+    X = np.delete(data, targets, axis=0)
+    R = data[targets]
     #Step-1: concat
-    
+    concatMat = np.concatenate((X, R), axis=0)
+    print(concatMat.shape)
      
     #Step-1
-    X_meaned = X - np.mean(X , axis = 0)
+    #X_meaned = X - np.mean(X , axis = 0)
      
     #Step-2
-    cov_mat = np.cov(X_meaned , rowvar = False)
+    #cov_mat = np.cov(X_meaned , rowvar = False)
      
     #Step-3
-    _, sigmas, __ = np.linalg.svd(X_meaned)
+    #_, sigmas, __ = np.linalg.svd(X_meaned)
 
-    eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
+    #eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
      
     #Step-4
-    sorted_index = np.argsort(eigen_values)[::-1]
-    sorted_eigenvalue = eigen_values[sorted_index]
-    sorted_eigenvectors = eigen_vectors[:,sorted_index]
+    #sorted_index = np.argsort(eigen_values)[::-1]
+    #sorted_eigenvalue = eigen_values[sorted_index]
+    #sorted_eigenvectors = eigen_vectors[:,sorted_index]
      
     #Step-5_A: components
-    pca_components = sorted_eigenvectors[:,0:n_components]
+    #pca_components = sorted_eigenvectors[:,0:n_components]
     #print("sratch components:", pca_components)
    
     #Step-5_B: Explained variances
     #explained_variances_ratios = [value / np.sum(sorted_eigenvalue) for value in sorted_eigenvalue]
-    explained_variances = sorted_eigenvalue[0:n_components]
+    #explained_variances = sorted_eigenvalue[0:n_components]
 
     #Step-5_C: Sigmas
-    singular_values = sigmas[0:n_components]
+    #singular_values = sigmas[0:n_components]
      
     #Step-6: Projections
-    X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    #X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
     
     #Step-7: Loadings
-    loadings = pca_components*singular_values
+    #loadings = pca_components*singular_values
 
-    return X_reduced, loadings
+    return X, R
 
 def PCA(X , n_components=2):
      
@@ -157,7 +162,22 @@ The alpha value, from the paper, should be set to 1.1 to start, though you are f
 '''
 @app.route('/ccpca', methods=['GET','POST'])
 def ccpca():
-    pass
+
+    if request.method == 'POST':
+        try:
+            targets =  request.get_json()["targets"]
+            print("entro pe", targets)
+        except Exception as e:
+            print(e)
+        
+        X, R = ccPCA(painting_attributes, targets)
+        print(X.shape, R.shape)
+    
+    if request.method == "GET":
+        X, R = ccPCA(painting_attributes, targets)
+        print(X.shape, R.shape)
+
+    return flask.jsonify({"loading_x": [], "loading_y":[], "projection": []})
 #
 
 '''
