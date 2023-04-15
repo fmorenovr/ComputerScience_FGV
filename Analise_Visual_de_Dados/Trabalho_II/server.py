@@ -6,8 +6,8 @@ import json
 import csv
 
 from flask import Flask, request
-from flask_restful import reqparse
 from flask_cors import CORS
+from pathlib import Path
 import math
 
 from sklearn.cluster import KMeans
@@ -16,39 +16,53 @@ from sklearn.cluster import KMeans
 app = Flask(__name__)
 CORS(app)
 
-targets = None;
+def get_current_path():
+    return str(Path(__file__).parent.resolve())
 
 #CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # --- these will be populated in the main --- #
 def ccPCA(data, targets , n_components=2, alpha=0.5):
-     
-    X = data.copy()
-    X = np.delete(data, targets, axis=0)
-    R = data[targets]
-    #Step-1: concat
-    concatMat = np.concatenate((X, R), axis=0)
-    print(X.shape, R.shape, concatMat.shape)
 
-    #applying ccPCA
-    concatMat_meaned = X - np.mean(X, axis = 0)
-    R_meaned = R - np.mean(R, axis = 0)
-    print(concatMat_meaned.shape, R_meaned.shape)
+    if len(targets)==0:
+        X_reduced, loadings = PCA(data, n_components=2)
+        return X_reduced, loadings
+    
+    #Step-0: create targets 
+    X_R = np.delete(data.copy(), targets, axis=0)
+    R = data[targets]
+    
+    #Step-1 A: concat
+    X = np.concatenate((X_R, R), axis=0)
+    print("X and R Matrix:", X.shape, X_R.shape, R.shape)
+
+    #Step-1 B: Standarize
+    x_mean = np.mean(X, axis = 0)
+    x_mean_square = np.mean(X**2, axis = 0)
+    X_meaned = ( X - x_mean ) / np.sqrt(x_mean_square)
+
+    r_mean = np.mean(R, axis = 0)
+    r_mean_square = np.mean(R**2, axis = 0)
+    R_meaned = ( R - r_mean ) / np.sqrt(r_mean_square)
+    
+    #Step-1 C: Evaluate if is finite
+    x_finite = np.isfinite(X_meaned)
+    X_meaned[x_finite!=True] = 0.
+    
+    r_finite = np.isfinite(R_meaned)
+    R_meaned[r_finite!=True] = 0.
+    print("X-meaned and R-meaned Matrix:", X_meaned.shape, R_meaned.shape)
 
     #Step-2: Covarianza
-    #final_matrix = concatMat_meaned - alpha*R_meaned
-    cov_mat_X = np.cov(concatMat_meaned , rowvar = False)
+    cov_mat_X = np.cov(X_meaned , rowvar = False)
     cov_mat_R = np.cov(R_meaned , rowvar = False)
-    print(cov_mat_X.shape, cov_mat_R.shape)
-    #print(cov_mat.shape)
-    #X_meaned = X - np.mean(X , axis = 0)
-
-    final_matrix = cov_mat_X - alpha*cov_mat_R
-    cov_mat = np.cov(final_matrix , rowvar = False)
+    cov_mat = np.cov(cov_mat_X - alpha*cov_mat_R , rowvar = False)
+    print("Covariance Matrix:", cov_mat.shape)
 
     #Step-3: eigen solver
+    _, sigmas, __ = np.linalg.svd(X_meaned)
+    
     eigen_values , eigen_vectors = np.linalg.eigh(cov_mat)
-    _, sigmas, __ = np.linalg.svd(cov_mat)
      
     #Step-4
     sorted_index = np.argsort(eigen_values)[::-1]
@@ -57,6 +71,7 @@ def ccPCA(data, targets , n_components=2, alpha=0.5):
      
     #Step-5_A: components
     pca_components = sorted_eigenvectors[:,0:n_components]
+    print("components:", pca_components.shape)
     #print("sratch components:", pca_components)
    
     #Step-5_B: Explained variances
@@ -67,7 +82,8 @@ def ccPCA(data, targets , n_components=2, alpha=0.5):
     singular_values = sigmas[0:n_components]
      
     #Step-6: Projections
-    X_reduced = np.dot(pca_components.transpose() , final_matrix.transpose() ).transpose()
+    X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    print("X-reduced Matrix:", X_reduced.shape)
     
     #Step-7: Loadings
     loadings = pca_components*singular_values
@@ -75,12 +91,15 @@ def ccPCA(data, targets , n_components=2, alpha=0.5):
     return X_reduced, loadings
 
 def PCA(X , n_components=2):
-     
+    
+    print("X Matrix:", X.shape) 
     #Step-1
     X_meaned = X - np.mean(X , axis = 0)
+    print("X-meaned Matrix:", X_meaned.shape)
      
     #Step-2
     cov_mat = np.cov(X_meaned , rowvar = False)
+    print("Covariance Matrix:", cov_mat.shape)
      
     #Step-3
     _, sigmas, __ = np.linalg.svd(X_meaned)
@@ -95,6 +114,7 @@ def PCA(X , n_components=2):
     #Step-5_A: components
     pca_components = sorted_eigenvectors[:,0:n_components]
     #print("sratch components:", pca_components)
+    print("components:", pca_components.shape)
    
     #Step-5_B: Explained variances
     #explained_variances_ratios = [value / np.sum(sorted_eigenvalue) for value in sorted_eigenvalue]
@@ -105,6 +125,7 @@ def PCA(X , n_components=2):
      
     #Step-6: Projections
     X_reduced = np.dot(pca_components.transpose() , X_meaned.transpose() ).transpose()
+    print("X-reduced Matrix:", X_reduced.shape)
     
     #Step-7: Loadings
     loadings = pca_components*singular_values
@@ -138,7 +159,11 @@ This will return an array of URLs containing the paths of images for the paintin
 '''
 @app.route('/get_painting_urls', methods=['GET'])
 def get_painting_urls():
-    return flask.jsonify(painting_image_urls)
+
+    absolute_current_path = get_current_path()
+    img_urls = [ f"{absolute_current_path}/{img_path}" for img_path in  painting_image_urls]
+    
+    return flask.jsonify(img_urls)
 #
 
 '''
@@ -160,7 +185,7 @@ def initial_pca():
     new_projection, loadings = PCA(painting_attributes, n_components=2)
     x_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,0].copy()) ] 
     y_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,1].copy()) ] 
-
+    
     return flask.jsonify({"loading_x": x_loadings, "loading_y":y_loadings, "projection": new_projection.tolist()})
 #
 
@@ -172,20 +197,19 @@ The alpha value, from the paper, should be set to 1.1 to start, though you are f
 @app.route('/ccpca', methods=['GET','POST'])
 def ccpca():
 
+    targets = [];
+    custom_alpha = 0.5;
+
     if request.method == 'POST':
         try:
             targets =  request.get_json()["targets"]
-            print("entro pe", targets)
+            custom_alpha =  request.get_json()["alpha"]
+            print("entro pe", targets, "alpha", alpha)
         except Exception as e:
             print(e)
         
-        new_projection, loadings = ccPCA(painting_attributes, targets)
-        print(request.method, new_projection.shape, loadings.shape)
+    new_projection, loadings = ccPCA(painting_attributes, targets, alpha=custom_alpha, n_components=2)
     
-    if request.method == "GET":
-        new_projection, loadings = ccPCA(painting_attributes, targets)
-        print(request.method, new_projection.shape, loadings.shape)
-        
     x_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,0].copy()) ] 
     y_loadings = [ {"attribute": a, "loading": b} for a,b in zip(attribute_names, loadings[:,1].copy()) ]
 
@@ -203,7 +227,7 @@ TODO: run kmeans on painting_attributes, returning data in the same format as in
 def kmeans():
     kmeans = KMeans(n_clusters=6, random_state=0, init="random").fit(painting_attributes)
     labels = kmeans.labels_
-    print(labels, labels.shape)
+    #print(labels, labels.shape)
     
     kmeans_data = []
     
