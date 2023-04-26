@@ -144,7 +144,7 @@ episode_names=json.load(open('episode_names.json','r'))
 # a list of painting image URLs of size n
 painting_image_urls=json.load(open('painting_image_urls.json','r'))
 
-print(painting_attributes, painting_attributes.shape)
+#print(painting_attributes, painting_attributes.shape)
 
 '''
 This will return an array of strings containing the episode names -> these should be displayed upon hovering over circles.
@@ -204,9 +204,9 @@ def ccpca():
         try:
             targets =  request.get_json()["targets"]
             custom_alpha =  request.get_json()["alpha"]
-            print("entro pe", targets, "alpha", alpha)
+            print("entro pe", targets, "alpha", custom_alpha)
         except Exception as e:
-            print(e)
+            print("ERROR", e)
         
     new_projection, loadings = ccPCA(painting_attributes, targets, alpha=custom_alpha, n_components=2)
     
