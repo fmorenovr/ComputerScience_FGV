@@ -5,19 +5,21 @@ import argparse
 import json
 import csv
 
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for
 from flask_cors import CORS
 from pathlib import Path
 import math
 
 from sklearn.cluster import KMeans
 
-# create Flask app
-app = Flask(__name__)
-CORS(app)
-
 def get_current_path():
     return str(Path(__file__).parent.resolve())
+
+absolute_current_path = get_current_path()
+
+# create Flask app
+app = Flask(__name__, static_folder=absolute_current_path+'/static')
+CORS(app)
 
 #CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
@@ -159,12 +161,22 @@ This will return an array of URLs containing the paths of images for the paintin
 '''
 @app.route('/get_painting_urls', methods=['GET'])
 def get_painting_urls():
-
-    absolute_current_path = get_current_path()
     img_urls = [ f"{absolute_current_path}/{img_path}" for img_path in  painting_image_urls]
     
+    img_urls = [ img_path.replace("\\", "/") for img_path in  img_urls]
+    
+    #img_encoded = [ get_encoded_img(f"{absolute_current_path}/{img_path}") for img_path in  painting_image_urls]
+    
+    print(img_urls[0])
+
+    #return flask.jsonify({"img_urls": img_urls, "img": img_encoded})
     return flask.jsonify(img_urls)
 #
+
+@app.route('/image/<img_name>', methods=['GET'])
+def get_image(img_name):
+
+    return redirect(url_for("static", filename=img_name))
 
 '''
 TODO: implement PCA, this should return data in the same format as you saw in the first part of the assignment:
