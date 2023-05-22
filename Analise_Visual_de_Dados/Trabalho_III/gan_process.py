@@ -83,17 +83,17 @@ def postprocess(images):
 #
 
 '''
-TODO
-
 Compute the Intersection-over-Union score between all pairs of channel activations for the provided tensors.
 The tensors should be of the same spatial resolution. Further, the tensors should be comprised of values 0 or 1, derived from quantile-based thresholding.
 This should return a tensor of shape (channel x channel)
 
 NOTE: this can be done with a few lines of code using broadcasting! (no loops necessary)
 '''
-def iou(a_i,a_j):
-    pass
-#
+def iou(channel1, channel2):
+    intersection = np.logical_and(channel1, channel2)
+    union = np.logical_or(channel1, channel2)
+    iou_score = np.sum(intersection, axis=(0, 1)) / np.sum(union, axis=(0, 1))
+    return iou_score
 
 '''
 TODO
@@ -101,17 +101,34 @@ TODO
 Given a tensor of activations (n_samples x channels x x-resolution x y-resolution), compute the per-channel top quantile (defined by perc), and then threshold activations
 based on the quantile (perform this per channel)
 '''
-def threshold(acts,k=4):
-    pass
+def threshold(tensor, k=4):
+    # Calculate the per-channel top quantile
+    quantiles = np.percentile(tensor, k, axis=(0, 2, 3))
+    print(quantiles.shape)
+    # Threshold activations based on the quantile
+    thresholded_tensor = np.where(tensor > quantiles[:, np.newaxis, np.newaxis], 1, 0)
+
+    return thresholded_tensor
+
+#def threshold(acts,k=4):
+#    channel_thresholds = np.percentile(acts, k, axis=(0, 1, 2))
+#    return channel_thresholds
+
+#    threshold = 1
+
+#    acts[acts >= threshold] = 1
+#    acts[acts < threshold] = 0
+
+#    return acts
 #
 
 def generate_samples(n_samples=20):
     act2,act3,act3_up,act4,image = sample_generator(n_samples=n_samples)
-    print(act2.size())
-    print(act3.size())
-    print(act3_up.size())
-    print(act4.size())
-    print(image.size())
+    #print(act2.size())
+    #print(act3.size())
+    #print(act3_up.size())
+    #print(act4.size())
+    #print(image.size())
 
     image_np = postprocess(image)
 
@@ -119,6 +136,12 @@ def generate_samples(n_samples=20):
     act3_np = tensor_to_numpy(act3)
     act3_up_np = tensor_to_numpy(act3_up)
     act4_np = tensor_to_numpy(act4)
+
+    # Threshold activations
+    act2_thres = threshold(act2_np)
+    act3_thres = threshold(act3_np)
+    act3_up_thres = threshold(act3_up_np)
+    act4_thres = threshold(act4_np)
     
     print(act2_np.shape)
     print(act3_np.shape)
@@ -143,7 +166,7 @@ def generate_samples(n_samples=20):
         img.save(image_filename)
     
     joblib.dump(data_dict, f"{absolute_current_path}/static/data.joblib")
-    print(data_dict)
+    #print(data_dict)
 '''
 TODO
 
