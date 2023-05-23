@@ -21,8 +21,8 @@ import math
 
 from matplotlib import pyplot as plt
 
+from scipy import ndimage
 import umap
-
 
 from file_functions import verifyDir, get_current_path
 
@@ -38,6 +38,9 @@ CORS(app)
 
 # number of clusters - feel free to adjust
 n_clusters = 9
+
+pool_size = (2, 2)
+
 
 # these variables will contain the clustering of channels for the different layers
 a2_clustering,a3_clustering,a4_clustering = None,None,None
@@ -55,16 +58,12 @@ def add_header(r):
 #
 
 '''
-TODO
-
 Implement spectral clustering, given an affinity matrix. You are required to implement this using standard matrix computation libraries, e.g. numpy, for computing a spectral embedding.
 You may use k-means once you've obtained the spectral embedding.
 
 NOTE: the affinity matrix should _not_ be symmetric! Nevertheless, eigenvectors will be real, up to numerical precision - so you should cast to real numbers (e.g. np.real).
 '''
 def spectral_clustering(affinity_mat, n_clusters):
-
-    #kmeans = KMeans(n_clusters=2, random_state=42).fit(affinity_mat)
 
     A = radius_neighbors_graph(affinity_mat,0.4,mode='distance', metric='minkowski', p=2, metric_params=None, include_self=False)
     # A = kneighbors_graph(X_mn, 2, mode='connectivity', metric='minkowski', p=2, metric_params=None, include_self=False)
@@ -73,11 +72,15 @@ def spectral_clustering(affinity_mat, n_clusters):
 
     eigval, eigvec = np.linalg.eig(L)
     eigvec_real = np.real(eigvec)
+    sorted_indices = np.argsort(eigval)
+    sorted_eigenvectors = eigvec_real[:, sorted_indices]
+    selected_eigenvectors = sorted_eigenvectors[:, :n_clusters]
 
-    B = np.sum(A,axis=0)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(eigvec_real)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(selected_eigenvectors)
     
     clusters_labels = kmeans.labels_
+
+    return clusters_labels
 #
 
 '''
@@ -118,9 +121,15 @@ def channel_dr():
 
     if request.method == 'POST':
         try:
-            channels =  request.get_json()["channels"]
-            channels_standard = StandardScaler().fit_transform(channels)
-            embedding = reducer.fit_transform(channels_standard)
+            layer_activations =  request.get_json()["layer_activations"]
+
+            # Max pooling
+            pooled_activations = ndimage.maximum_pool(layer_activations, pool_size)
+            n_samples, channels, pooled_height, pooled_width = pooled_activations.shape
+            pooled_activations_reshape = pooled_activations.reshape(n_samples, channels * pooled_height * pooled_width)
+
+            # UMAP
+            embedding = reducer.fit_transform(pooled_activations_reshape)
             embedding = embedding.tolist()
             print("results embedding:", embedding.shape)
         except Exception as e:
@@ -161,4 +170,4 @@ In the main, before running the server, run clustering, store results in variabl
 '''
 if __name__=='__main__':
     app.run()
-#
+# pip install scipy umap-learn numpy

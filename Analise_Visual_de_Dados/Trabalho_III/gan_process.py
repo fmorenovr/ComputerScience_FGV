@@ -63,10 +63,8 @@ def sample_generator(n_samples=1):
         act4 = gen_out['act4'].detach()
 
         image = gen_out['image'].detach()
-    #
 
     return act2,act3,act3_up,act4,image
-#
 
 def tensor_to_numpy(tensor):
     return tensor.numpy()
@@ -89,38 +87,39 @@ This should return a tensor of shape (channel x channel)
 
 NOTE: this can be done with a few lines of code using broadcasting! (no loops necessary)
 '''
-def iou(channel1, channel2):
-    intersection = np.logical_and(channel1, channel2)
-    union = np.logical_or(channel1, channel2)
-    iou_score = np.sum(intersection, axis=(0, 1)) / np.sum(union, axis=(0, 1))
+def iou(a_i, a_j): #between twp images/filters
+    intersection = np.logical_and(a_i, a_j)
+    union = np.logical_or(a_i, a_j)
+    iou_score = np.sum(intersection) / np.sum(union)
     return iou_score
 
-'''
-TODO
+def calculate_iou_scores(image1, image2, num_channels=512):
+    n_samples = image1.shape[0]
+    iou_scores = np.zeros((num_channels, num_channels))
+    final_iou_scores = np.zeros((n_samples, num_channels, num_channels))
 
+    for index, (img1, img2) in enumerate(zip(image1, image2)):
+        #print(img1.shape, img2.shape)
+        for i in range(num_channels):
+            for j in range(num_channels):
+                iou_scores[i][j] = iou(img1[i], img2[j])
+        
+        final_iou_scores[index] = iou_scores
+
+    return final_iou_scores
+
+'''
 Given a tensor of activations (n_samples x channels x x-resolution x y-resolution), compute the per-channel top quantile (defined by perc), and then threshold activations
 based on the quantile (perform this per channel)
 '''
 def threshold(tensor, k=4):
     # Calculate the per-channel top quantile
     quantiles = np.percentile(tensor, k, axis=(0, 2, 3))
-    print(quantiles.shape)
+    #print(quantiles.shape)
     # Threshold activations based on the quantile
     thresholded_tensor = np.where(tensor > quantiles[:, np.newaxis, np.newaxis], 1, 0)
 
     return thresholded_tensor
-
-#def threshold(acts,k=4):
-#    channel_thresholds = np.percentile(acts, k, axis=(0, 1, 2))
-#    return channel_thresholds
-
-#    threshold = 1
-
-#    acts[acts >= threshold] = 1
-#    acts[acts < threshold] = 0
-
-#    return acts
-#
 
 def generate_samples(n_samples=20):
     act2,act3,act3_up,act4,image = sample_generator(n_samples=n_samples)
@@ -136,21 +135,38 @@ def generate_samples(n_samples=20):
     act3_np = tensor_to_numpy(act3)
     act3_up_np = tensor_to_numpy(act3_up)
     act4_np = tensor_to_numpy(act4)
+    
+    print("layer 2", act2_np.shape)
+    print("layer 3", act3_np.shape)
+    print("layer 3_up", act3_up_np.shape)
+    print("layer 4", act4_np.shape)
+    print("image", image_np.shape)
 
     # Threshold activations
     act2_thres = threshold(act2_np)
     act3_thres = threshold(act3_np)
     act3_up_thres = threshold(act3_up_np)
     act4_thres = threshold(act4_np)
+
+    print("layer 2 thresholded", act2_np.shape)
+
+    # IoU
+    act23_iou = calculate_iou_scores(act2_thres, act3_thres)
+    act34_iou = calculate_iou_scores(act3_up_thres, act4_thres)
     
-    print(act2_np.shape)
-    print(act3_np.shape)
-    print(act3_up_np.shape)
-    print(act4_np.shape)
-    print(image_np.shape)
+    print("iou 23", act23_iou.shape)
+    print("iou 34", act34_iou.shape)
 
     data_dict = {}
+    data_dict["act2_thres"] = act2_thres
+    data_dict["act3_thres"] = act3_thres
+    data_dict["act3_up_thres"] = act3_up_thres
+    data_dict["act4_thres"] = act4_thres
 
+    data_dict["act23_iou"] = act23_iou
+    data_dict["act34_iou"] = act34_iou
+
+    # Images, threshold, and IoU to disk
     for i, t in tqdm(enumerate(zip(act2_np, act3_np, act3_up_np, act4_np, image_np))):
         image_filename = f"{absolute_current_path}/static/sample_{i+1}.png"
         data_dict[f"sample_{i+1}"] = {}
@@ -167,9 +183,9 @@ def generate_samples(n_samples=20):
     
     joblib.dump(data_dict, f"{absolute_current_path}/static/data.joblib")
     #print(data_dict)
-'''
-TODO
 
+
+'''
 Preprocessing:
     1. Generate a set of samples from the generator network (see sample_generator above).
     2. Threshold channel activations at each layer.
@@ -180,8 +196,8 @@ Preprocessing:
 Write everything to the 'static' directory.
 '''
 if __name__=='__main__':
-
-    generate_samples(30)
+    verifyDir("./static/")
+    generate_samples(200)
 
     
 
