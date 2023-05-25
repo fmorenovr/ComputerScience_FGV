@@ -10,7 +10,6 @@ import numpy as np
 def openFile(filename):
   with open(filename) as f:
     config = json.load(f)
-  
   return config
 
 def get_db_names(path):

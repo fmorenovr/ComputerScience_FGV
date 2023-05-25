@@ -7,6 +7,7 @@ import joblib
 from tqdm import tqdm
 
 import torch
+from torchsummary import summary
 
 from models import MODEL_ZOO
 from models import build_generator
@@ -49,7 +50,7 @@ In particular:
 '''
 def sample_generator(n_samples=1):
     code = torch.randn(n_samples,generator.z_space_dim)
-    print(code.size())
+    print("Input vector", code.size())
     if is_cuda:
         code = code.cuda()
 
@@ -142,13 +143,27 @@ def generate_samples(n_samples=20):
     print("layer 4", act4_np.shape)
     print("image", image_np.shape)
 
+    data_dict = {}
+    data_dict["act2"] = act2_np
+    data_dict["act3"] = act3_np
+    data_dict["act3_up"] = act3_up_np
+    data_dict["act4"] = act4_np
+
     # Threshold activations
     act2_thres = threshold(act2_np)
     act3_thres = threshold(act3_np)
     act3_up_thres = threshold(act3_up_np)
     act4_thres = threshold(act4_np)
+    
+    print("layer 2 thresholded", act2_thres.shape)
+    print("layer 2 thresholded", act2_thres.shape)
+    print("layer 3_up thresholded", act3_up_thres.shape)
+    print("layer 4 thresholded", act4_thres.shape)
 
-    print("layer 2 thresholded", act2_np.shape)
+    data_dict["act2_thres"] = act2_thres
+    data_dict["act3_thres"] = act3_thres
+    data_dict["act3_up_thres"] = act3_up_thres
+    data_dict["act4_thres"] = act4_thres
 
     # IoU
     act23_iou = calculate_iou_scores(act2_thres, act3_thres)
@@ -157,22 +172,22 @@ def generate_samples(n_samples=20):
     print("iou 23", act23_iou.shape)
     print("iou 34", act34_iou.shape)
 
-    data_dict = {}
-    data_dict["act2_thres"] = act2_thres
-    data_dict["act3_thres"] = act3_thres
-    data_dict["act3_up_thres"] = act3_up_thres
-    data_dict["act4_thres"] = act4_thres
-
     data_dict["act23_iou"] = act23_iou
     data_dict["act34_iou"] = act34_iou
+    
+    images_path = []
 
     # Images, threshold, and IoU to disk
     for i, t in tqdm(enumerate(zip(act2_np, act3_np, act3_up_np, act4_np, image_np))):
         image_filename = f"{absolute_current_path}/static/sample_{i+1}.png"
+        
+        images_path.append(image_filename)
+        
         data_dict[f"sample_{i+1}"] = {}
 
         act2_np_, act3_np_, act3_up_np_, act4_np_, image_np_ = t
         
+        data_dict[f"sample_{i+1}"]["image"] = image_filename
         data_dict[f"sample_{i+1}"]["atc2"] = act2_np_
         data_dict[f"sample_{i+1}"]["atc3"] = act3_np_
         data_dict[f"sample_{i+1}"]["act3_up"] = act3_up_np_
@@ -201,5 +216,3 @@ if __name__=='__main__':
 
     
 
-
-#
