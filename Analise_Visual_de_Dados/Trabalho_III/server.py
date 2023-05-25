@@ -172,6 +172,11 @@ def get_2D_projection(layer_num):
     
     return projection
 
+@app.route('/get_painting_urls', methods=['GET'])
+def get_painting_urls():
+    
+    return flask.jsonify(data_dict["images"])
+
 @app.route('/channel_dr', methods=['GET','POST'])
 def channel_dr():
 

@@ -196,6 +196,8 @@ def generate_samples(n_samples=20):
         img = Image.fromarray(image_np_, "RGB")
         img.save(image_filename)
     
+    data_dict["images"] = images_path
+    
     joblib.dump(data_dict, f"{absolute_current_path}/static/data.joblib")
     #print(data_dict)
 
