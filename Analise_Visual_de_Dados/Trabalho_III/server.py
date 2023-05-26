@@ -172,11 +172,6 @@ def get_2D_projection(layer_num):
     
     return projection
 
-@app.route('/get_painting_urls', methods=['GET'])
-def get_painting_urls():
-    
-    return flask.jsonify(data_dict["images"])
-
 @app.route('/channel_dr', methods=['GET','POST'])
 def channel_dr():
 
@@ -214,7 +209,19 @@ Compute correlation strength over all instances.
 @app.route('/activation_correlation_clustering', methods=['GET'])
 def activation_correlation_clustering():
     pass
-#
+
+
+@app.route('/get_image_path', methods=['GET'])
+def get_image_path():
+    
+    return flask.jsonify(data_dict["images"])
+
+@app.route('/get_image_url', methods=['GET'])
+def get_image_url():
+
+    img_url = [  f"http://localhost:8080/static/{img.split('/')[-1]}" for img in  data_dict["images"] ]
+    
+    return flask.jsonify(img_url)
 
 @app.route('/image/<img_name>', methods=['GET'])
 def get_image(img_name):
@@ -232,5 +239,5 @@ if __name__=='__main__':
     a3_clustering = get_2D_projection(3)
     a4_clustering = get_2D_projection(4)
 
-    app.run()
+    app.run(port=8080)
 
