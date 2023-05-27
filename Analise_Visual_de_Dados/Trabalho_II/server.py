@@ -164,10 +164,8 @@ def get_painting_urls():
     img_urls = [ f"{absolute_current_path}/{img_path}" for img_path in  painting_image_urls]
     
     img_urls = [ img_path.replace("\\", "/") for img_path in  img_urls]
-    
-    #img_encoded = [ get_encoded_img(f"{absolute_current_path}/{img_path}") for img_path in  painting_image_urls]
-    
-    print(img_urls[0])
+
+    img_urls = [  f"http://localhost:5000/static/{img.split('/')[-1]}" for img in  img_urls ]
 
     #return flask.jsonify({"img_urls": img_urls, "img": img_encoded})
     return flask.jsonify(img_urls)
