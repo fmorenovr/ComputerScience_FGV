@@ -14,6 +14,8 @@ from models import build_generator
 
 from file_functions import verifyDir, get_current_path
 
+os.environ["CUDA_VISIBLE_DEVICES"]=""
+
 absolute_current_path = get_current_path()
 
 # if you have CUDA-enabled GPU, set this to True!
@@ -172,9 +174,9 @@ def generate_samples(n_samples=20):
     print("iou 23", act23_iou.shape)
     print("iou 34", act34_iou.shape)
 
-    data_dict["act23_iou"] = act23_iou
-    data_dict["act34_iou"] = act34_iou
-    
+    data_dict["iou23"] = act23_iou
+    data_dict["iou34"] = act34_iou
+
     images_path = []
 
     # Images, threshold, and IoU to disk
