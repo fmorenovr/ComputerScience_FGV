@@ -116,8 +116,9 @@ Given a tensor of activations (n_samples x channels x x-resolution x y-resolutio
 based on the quantile (perform this per channel)
 '''
 def threshold(tensor, k=4):
+    percent = 100 - 100/k
     # Calculate the per-channel top quantile
-    quantiles = np.percentile(tensor, k, axis=(0, 2, 3))
+    quantiles = np.percentile(tensor, percent, axis=(0, 2, 3))
     #print(quantiles.shape)
     # Threshold activations based on the quantile
     thresholded_tensor = np.where(tensor > quantiles[:, np.newaxis, np.newaxis], 1, 0)
