@@ -152,14 +152,20 @@ def generate_samples(n_samples=20):
     data_dict["act4"] = act4_np
 
     # Threshold activations
+    print("processing threshold in layer 2 ...")
     act2_thres = threshold(act2_np)
-    act3_thres = threshold(act3_np)
-    act3_up_thres = threshold(act3_up_np)
-    act4_thres = threshold(act4_np)
+    print("layer 2 thresholded", act2_thres.shape)
     
+    print("processing threshold in layer 3 ...")
+    act3_thres = threshold(act3_np)
     print("layer 2 thresholded", act2_thres.shape)
-    print("layer 2 thresholded", act2_thres.shape)
+    
+    print("processing threshold in layer 3_up ...")
+    act3_up_thres = threshold(act3_up_np)
     print("layer 3_up thresholded", act3_up_thres.shape)
+    
+    print("processing threshold in layer 4 ...")
+    act4_thres = threshold(act4_np)
     print("layer 4 thresholded", act4_thres.shape)
 
     data_dict["act2_thres"] = act2_thres
@@ -168,14 +174,19 @@ def generate_samples(n_samples=20):
     data_dict["act4_thres"] = act4_thres
 
     # IoU
+    print("processing IOU23 ...")
     act23_iou = calculate_iou_scores(act2_thres, act3_thres)
-    act34_iou = calculate_iou_scores(act3_up_thres, act4_thres)
-    
     print("iou 23", act23_iou.shape)
+    
+    print("processing IOU34 ...")
+    act34_iou = calculate_iou_scores(act3_up_thres, act4_thres)
     print("iou 34", act34_iou.shape)
 
-    data_dict["iou23"] = act23_iou
-    data_dict["iou34"] = act34_iou
+    data_dict["iou_23"] = act23_iou
+    data_dict["iou_34"] = act34_iou
+    
+    # Similarity Matrix
+    
 
     images_path = []
 
