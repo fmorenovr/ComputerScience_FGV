@@ -153,8 +153,10 @@ Given a tensor of activations (n_samples x channels x x-resolution x y-resolutio
 based on the quantile (perform this per channel)
 '''
 def threshold(tensor, k=4):
+    perc = 1/k
+
     # Calculate the per-channel top quantile
-    quantiles = np.percentile(tensor, k, axis=(0, 2, 3))
+    quantiles = np.percentile(tensor, 100 - perc * 100, axis=(0, 2, 3))
     #print(quantiles.shape)
     # Threshold activations based on the quantile
     thresholded_tensor = np.where(tensor > quantiles[:, np.newaxis, np.newaxis], 1, 0)
@@ -163,12 +165,8 @@ def threshold(tensor, k=4):
 
 def generate_samples(n_samples=20):
     act2,act3,act3_up,act4,image = sample_generator(n_samples=n_samples)
-    #print(act2.size())
-    #print(act3.size())
-    #print(act3_up.size())
-    #print(act4.size())
-    #print(image.size())
 
+    print("processing from tensor to numpy ...")
     image_np = postprocess(image)
 
     act2_np = tensor_to_numpy(act2)
