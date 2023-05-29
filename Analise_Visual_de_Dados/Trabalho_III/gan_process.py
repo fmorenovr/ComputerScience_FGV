@@ -159,7 +159,7 @@ def calculate_sim_matrix(act23_iou, act34_iou):
 Given a tensor of activations (n_samples x channels x x-resolution x y-resolution), compute the per-channel top quantile (defined by perc), and then threshold activations
 based on the quantile (perform this per channel)
 '''
-def threshold(tensor, k=4):
+def threshold(tensor, k=10):
     perc = 1/k
 
     # Calculate the per-channel top quantile
