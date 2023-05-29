@@ -14,7 +14,7 @@ from models import build_generator
 
 from file_functions import verifyDir, get_current_path
 
-os.environ["CUDA_VISIBLE_DEVICES"]=""
+#os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 absolute_current_path = get_current_path()
 
@@ -93,7 +93,14 @@ NOTE: this can be done with a few lines of code using broadcasting! (no loops ne
 def iou(a_i, a_j): #between twp images/filters
     intersection = np.logical_and(a_i, a_j)
     union = np.logical_or(a_i, a_j)
-    iou_score = np.sum(intersection) / np.sum(union)
+    
+    intersection_sum = np.sum(intersection)
+    union_sum = np.sum(union)
+    
+    if union_sum == 0:
+        iou_score = 0.0
+    else:
+        iou_score = intersection_sum / union_sum
     return iou_score
 
 def calculate_iou_scores(image1, image2, num_channels=512):
@@ -116,9 +123,9 @@ def calculate_sim_matrix(act23_iou, act34_iou):
     width, heigth = act23_iou.shape[1], act23_iou.shape[2] 
 
     S_23 = np.sum(act23_iou, axis=0)
-    print("Similarity matrix S_23", S_23, S_23.shape)
+    print("Similarity matrix S_23", S_23.shape)
     S_34 = np.sum(act34_iou, axis=0)
-    print("Similarity matrix S_34", S_34, S_34.shape)
+    print("Similarity matrix S_34", S_34.shape)
 
     R_2 = np.zeros((width, heigth))
     C_3 = np.zeros((width, heigth))

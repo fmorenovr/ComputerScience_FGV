@@ -15,13 +15,15 @@ from sklearn.decomposition import PCA
 from scipy.sparse import csgraph
 from sklearn.neighbors import radius_neighbors_graph, kneighbors_graph
 
-from collections import Counter
+from collections import Counter, OrderedDict
 
 from flask import Flask, request, redirect, url_for
 from flask_cors import CORS
 from pathlib import Path
+import copy
 import math
 import joblib
+import itertools
 
 from matplotlib import pyplot as plt
 
@@ -44,19 +46,22 @@ data_dict = joblib.load(f"{absolute_current_path}/static/data.joblib")
 #similarity matrix
 iou_23 = data_dict["iou_23"]
 iou_34 = data_dict["iou_34"]
-print(iou_34.shape)
 
 S_2 = data_dict["S_2"]
 S_3 = data_dict["S_3"]
 S_4 = data_dict["S_4"]
-    #print("S_2", S_2.shape, S_2)
-    #print("S_3", S_3.shape, S_3)
-    #print("S_4", S_4.shape, S_4)
 
-#act2_thres = data_dict["act2_thres"]
-#act3_thres = data_dict["act3_thres"]
-#act3_up_thres = data_dict["act3_up_thres"]
-#act4_thres = data_dict["act4_thres"]
+'''
+act2_thres = data_dict["act2_thres"]
+act3_thres = data_dict["act3_thres"]
+act3_up_thres = data_dict["act3_up_thres"]
+act4_thres = data_dict["act4_thres"]
+
+print(np.unique(act2_thres))
+print(np.unique(act3_thres))
+print(np.unique(act3_up_thres))
+print(np.unique(act4_thres))
+'''
 
 # number of clusters - feel free to adjust
 n_clusters = 9
@@ -66,6 +71,8 @@ pool_size = (2, 2)
 # these variables will contain the clustering of channels for the different layers
 a2_clustering,a3_clustering,a4_clustering = None, None, None
 S_2_cluster, S_3_cluster, S_4_cluster = None, None, None
+cluster_2_count, cluster_3_count, cluster_4_count = None, None, None
+all_correlation_23, all_correlation_34 = None, None
 
 '''
 Do not cache images on browser, see: https://stackoverflow.com/questions/34066804/disabling-caching-in-flask
@@ -134,15 +141,22 @@ def multiway_spectral_clustering(iou_23, iou_34, n_clusters=n_clusters):
     #print("S_4_standard", S_4_standard.shape, S_4_standard)
 
     S_2_cluster = spectral_clustering(S_2_standard)
-    S_2_sklearn = SpectralClustering(n_clusters=n_clusters).fit(S_2_standard).labels_
-    S_3_cluster = spectral_clustering(S_3_standard)
-    S_3_sklearn = SpectralClustering(n_clusters=n_clusters).fit(S_2_standard).labels_
-    S_4_cluster = spectral_clustering(S_4_standard)
-    S_4_sklearn = SpectralClustering(n_clusters=n_clusters).fit(S_2_standard).labels_
+    print("cluster 2", S_2_cluster.shape)
+    print("scratch", S_2_cluster)
+    #S_2_sklearn = SpectralClustering(n_clusters=n_clusters).fit_predict(S_2_standard)
+    #print("sklearn", S_2_sklearn)
 
-    print("normal", S_2_cluster, "sklearn", S_2_sklearn)
-    print("normal", S_3_cluster, "sklearn", S_3_sklearn)
-    print("normal", S_4_cluster, "sklearn", S_4_sklearn)
+    S_3_cluster = spectral_clustering(S_3_standard)
+    print("cluster 3", S_3_cluster.shape)
+    print("scratch", S_3_cluster)
+    #S_3_sklearn = SpectralClustering(n_clusters=n_clusters).fit_predict(S_3_standard)
+    #print("sklearn", S_3_sklearn)
+    
+    S_4_cluster = spectral_clustering(S_4_standard)
+    print("cluster 4", S_4_cluster.shape)
+    print("scratch", S_4_cluster)
+    #S_4_sklearn = SpectralClustering(n_clusters=n_clusters).fit_predict(S_4_standard)
+    #print("sklearn", S_4_sklearn)
 
     return S_2_cluster, S_3_cluster, S_4_cluster
 
@@ -150,33 +164,78 @@ def multiway_spectral_clustering(iou_23, iou_34, n_clusters=n_clusters):
 TODO
 Given a link selected from the visualization, namely the layer and clusters at the individual layers, this route should compute the mean correlation from all channels in the source layer and all channels in the target layer, for each sample.
 '''
-def channel_correlation(layer1_activations, layer2_activations):
-    # Reshape activations to (n, 512, 8*8)
-    layer1_reshaped = np.reshape(layer1_activations, (layer1_activations.shape[0], 512, -1))
-    layer2_reshaped = np.reshape(layer2_activations, (layer2_activations.shape[0], 512, -1))
+def sort_dict(dict_):
+    sorted_keys = sorted(dict_.keys())
     
-    # Compute channel-wise mean
-    layer1_mean = np.mean(layer1_reshaped, axis=2, keepdims=True)
-    layer2_mean = np.mean(layer2_reshaped, axis=2, keepdims=True)
+    new_dict = {}
+    for key in sorted_keys:
+        new_dict[key] = dict_[key]
     
-    # Compute channel-wise standard deviation
-    layer1_std = np.std(layer1_reshaped, axis=2, keepdims=True)
-    layer2_std = np.std(layer2_reshaped, axis=2, keepdims=True)
+    return new_dict
+
+def channel_correlation(iou_matrix, cluster_a, cluster_b, layer_name="", selected_ids=None):
+    if selected_ids is not None:
+        iou_ab = iou_matrix[selected_ids]
+    else:
+        iou_ab = iou_matrix.copy()
+
+    n_samples = iou_ab.shape[0]
     
-    # Compute correlation between channels
-    correlation = np.mean(((layer1_reshaped - layer1_mean) / layer1_std) * ((layer2_reshaped - layer2_mean) / layer2_std),
-                          axis=2)
+    first_channels, second_channels = iou_ab.shape[1], iou_ab.shape[2]
     
-    return correlation
+    cluster_a_count = sort_dict(dict(Counter([str(num) for num in cluster_a])))
+    cluster_a_label = list(cluster_a_count.keys())
+    
+    cluster_b_count = sort_dict(dict(Counter([str(num) for num in cluster_b])))
+    cluster_b_label = list(cluster_b_count.keys())
+    
+    cluster_dict = {}
+    for channel_a in cluster_a_label:
+        cluster_dict[channel_a] = {}
+        for channel_b in cluster_b_label:
+            cluster_dict[channel_a][channel_b] = {}
+            
+            Z = n_samples*cluster_a_count[channel_a]*cluster_b_count[channel_b]
+            indexes_a = list(np.where(cluster_a == int(channel_a))[0])
+            indexes_b = list(np.where(cluster_b == int(channel_b))[0])
+            indexes_ab = np.array(tuple(itertools.product(list(range(n_samples)), indexes_a, indexes_b)))
+            
+            values = iou_ab[indexes_ab[:, 0], indexes_ab[:, 1], indexes_ab[:, 2]]
+            
+            cluster_dict[channel_a][channel_b]["correlation"] = values.sum()*1.0/Z
+            
+            all_index = indexes_ab[:, 0].copy()
+            indexes_samples = values > 0.0
+            used_samples = np.unique(all_index[indexes_samples]).tolist()
+            
+            cluster_dict[channel_a][channel_b]["samples"] = used_samples
+            
+            cluster_dict[channel_a][channel_b]["samples_sum"] = values.sum()
+            cluster_dict[channel_a][channel_b]["Z"] = Z
+    
+    result_data = []
+    
+    for channel_a in cluster_a_label:
+        for channel_b in cluster_b_label:
+            new_data = {}
+            new_data["layer_name"] = layer_name
+            new_data["source"] = int(channel_a)
+            new_data["source_count"] = cluster_a_count[channel_a]
+            new_data["target"] = int(channel_b)
+            new_data["target_count"] = cluster_b_count[channel_b]
+            new_data["correlation"] = cluster_dict[channel_a][channel_b]["correlation"]
+            new_data["samples"] = cluster_dict[channel_a][channel_b]["samples"]
+            new_data["samples_used"] = len(cluster_dict[channel_a][channel_b]["samples"])
+            new_data["samples_sum"] = cluster_dict[channel_a][channel_b]["samples_sum"]
+            new_data["Z"] = cluster_dict[channel_a][channel_b]["Z"]
+            
+            result_data.append(new_data)
+    
+    return result_data
 
 @app.route('/link_score', methods=['GET','POST'])
 def link_score():
-
-    if request.method == 'POST':
-        la_1 =  request.get_json()["layer_activations_1"]
-        la_2 =  request.get_json()["layer_activations_2"]
-        
-        correlation = channel_correlation(la_1, la_2)
+    pass
 #
 
 '''
@@ -236,23 +295,40 @@ def channel_dr():
 #
 
 '''
-TODO
-
 Compute correlation strength over selected instances, those brushed by the user.
 '''
 @app.route('/selected_correlation', methods=['GET','POST'])
 def selected_correlation():
-    pass
-#
+    selected_ids = None
+    if request.method == 'POST':
+        try:
+            selected_ids =  request.get_json()["selected_ids"]
+            print("Layer selected", layer_activations)
+        except Exception as e:
+            print("ERROR", e)
+    
+    if selected_ids is None:
+        selected_correlation_23 = copy.deepcopy(all_correlation_23)
+        selected_correlation_34 = copy.deepcopy(all_correlation_34)
+    else:
+        selected_correlation_23 = channel_correlation(iou_23, S_2_cluster, S_3_cluster, selected_ids=selected_ids, layer_name="layers_23")
+        
+        selected_correlation_34 = channel_correlation(iou_34, S_3_cluster, S_4_cluster, selected_ids=selected_ids, layer_name="layers_34")
+    
+    selected_correlation_23.extend(selected_correlation_34)
+    
+    return flask.jsonify(selected_correlation_23)
 
 '''
-TODO
-
 Compute correlation strength over all instances.
 '''
 @app.route('/activation_correlation_clustering', methods=['GET'])
 def activation_correlation_clustering():
-    pass
+
+    all_correlation_234 = copy.deepcopy(all_correlation_23)
+    all_correlation_234.extend(copy.deepcopy(all_correlation_34))
+    
+    return flask.jsonify(all_correlation_234)
 
 '''
 Get generated images.
@@ -279,15 +355,13 @@ Get clusters !!! Entermate:
 '''
 @app.route('/get_clusters', methods=['GET'])
 def get_clusters():
-    cluster_2_count = dict(Counter(S_2_cluster))
-    cluster_3_count = dict(Counter(S_3_cluster))
-    cluster_4_count = dict(Counter(S_4_cluster))
 
-    return_dict = {
-            "layer_2": cluster_2_count,
-            "layer_3": cluster_3_count,
-            "layer_4": cluster_4_count,
-    }
+    return_dict = [
+            {"layer_2": cluster_2_count},
+            {"layer_3": cluster_3_count},
+            {"layer_4": cluster_4_count},
+    ]
+    print(return_dict)
 
     return flask.jsonify(return_dict)
 
@@ -305,6 +379,18 @@ if __name__=='__main__':
 
     print("Clustering channels ...")
     S_2_cluster, S_3_cluster, S_4_cluster = multiway_spectral_clustering(iou_23, iou_34)
+    
+    print("Calculating clusters frequencies ...")
+    cluster_2_count = sort_dict(dict(Counter([str(num) for num in S_2_cluster])))
+    print(cluster_2_count)
+    cluster_3_count = sort_dict(dict(Counter([str(num) for num in S_3_cluster])))
+    print(cluster_3_count)
+    cluster_4_count = sort_dict(dict(Counter([str(num) for num in S_4_cluster])))
+    print(cluster_4_count)
+
+    print("Processing channel correlations ...")
+    all_correlation_23 = channel_correlation(iou_23, S_2_cluster, S_3_cluster, layer_name="layers_23")
+    all_correlation_34 = channel_correlation(iou_34, S_3_cluster, S_4_cluster, layer_name="layers_34")
 
     print("Initializing server ...")
     app.run(port=8080)
