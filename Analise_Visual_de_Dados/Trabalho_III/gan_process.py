@@ -111,6 +111,43 @@ def calculate_iou_scores(image1, image2, num_channels=512):
 
     return final_iou_scores
 
+def calculate_sim_matrix(act23_iou, act34_iou):
+
+    width, heigth = act23_iou.shape[1], act23_iou.shape[2] 
+
+    S_23 = np.sum(act23_iou, axis=0)
+    print("Similarity matrix S_23", S_23, S_23.shape)
+    S_34 = np.sum(act34_iou, axis=0)
+    print("Similarity matrix S_34", S_34, S_34.shape)
+
+    R_2 = np.zeros((width, heigth))
+    C_3 = np.zeros((width, heigth))
+
+    for i in range(width):
+        R_2[i][i] = np.sum(S_23[i, :])
+        C_3[i][i] = np.sum(S_23[:, i])
+
+    R_3 = np.zeros((width, heigth))
+    C_4 = np.zeros((width, heigth))
+
+    for i in range(heigth):
+        R_3[i][i] = np.sum(S_34[i, :])
+        C_4[i][i] = np.sum(S_34[:, i])
+
+    SR_2 = np.matmul( np.linalg.inv(R_2), S_23)
+    SC_2 = np.transpose( np.matmul( S_23, np.linalg.inv(C_3) ) )
+    S_2 = np.matmul(SR_2, SC_2)
+
+    SC_4 = np.transpose( np.matmul(S_34, np.linalg.inv(C_4)) )
+    SR_4 = np.matmul(np.linalg.inv(R_3) , S_34)
+    S_4 = np.matmul(SC_4, SR_4)
+
+    SR_3 = np.matmul(SC_2, SR_2)
+    SC_3 = np.matmul(SR_4, SC_4)
+    S_3 = SR_3 + SC_3
+
+    return S_2, S_3, S_4
+
 '''
 Given a tensor of activations (n_samples x channels x x-resolution x y-resolution), compute the per-channel top quantile (defined by perc), and then threshold activations
 based on the quantile (perform this per channel)
@@ -191,6 +228,12 @@ def generate_samples(n_samples=20):
     data_dict["iou_23"] = act23_iou
     data_dict["iou_34"] = act34_iou
 
+    # calculating matrix to cluster
+    S_2, S_3, S_4 = calculate_sim_matrix(act23_iou, act34_iou)
+    data_dict["S_2"] = S_2
+    data_dict["S_3"] = S_3
+    data_dict["S_4"] = S_4
+
     images_path = []
 
     # Images, threshold, and IoU to disk
@@ -216,7 +259,6 @@ def generate_samples(n_samples=20):
     
     joblib.dump(data_dict, f"{absolute_current_path}/static/data.joblib")
     #print(data_dict)
-
 
 '''
 Preprocessing:
