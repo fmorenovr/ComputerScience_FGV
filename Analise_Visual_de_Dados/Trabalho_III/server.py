@@ -303,7 +303,7 @@ def selected_correlation():
     if request.method == 'POST':
         try:
             selected_ids =  request.get_json()["selected_ids"]
-            print("Layer selected", layer_activations)
+            print("Selected samples", selected_ids)
         except Exception as e:
             print("ERROR", e)
     
@@ -393,5 +393,5 @@ if __name__=='__main__':
     all_correlation_34 = channel_correlation(iou_34, S_3_cluster, S_4_cluster, layer_name="layers_34")
 
     print("Initializing server ...")
-    app.run(port=8080)
+    app.run(port=8080, use_reloader=False, threaded=True)
 
