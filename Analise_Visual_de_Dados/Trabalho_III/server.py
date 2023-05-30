@@ -51,6 +51,8 @@ S_2 = data_dict["S_2"]
 S_3 = data_dict["S_3"]
 S_4 = data_dict["S_4"]
 
+img_url_data = [  f"http://localhost:8080/static/{img.split('/')[-1]}" for img in  data_dict["images"] ]
+
 '''
 act2_thres = data_dict["act2_thres"]
 act3_thres = data_dict["act3_thres"]
@@ -173,15 +175,9 @@ def sort_dict(dict_):
     
     return new_dict
 
-def channel_correlation(iou_matrix, cluster_a, cluster_b, layer_name="", selected_ids=None):
-    if selected_ids is not None:
-        iou_ab = iou_matrix[selected_ids]
-    else:
-        iou_ab = iou_matrix.copy()
+def link_channel_correlation(iou_ab, channel_a, channel_b, cluster_a, cluster_b, layer_name=""):
 
     n_samples = iou_ab.shape[0]
-    
-    first_channels, second_channels = iou_ab.shape[1], iou_ab.shape[2]
     
     cluster_a_count = sort_dict(dict(Counter([str(num) for num in cluster_a])))
     cluster_a_label = list(cluster_a_count.keys())
@@ -189,55 +185,59 @@ def channel_correlation(iou_matrix, cluster_a, cluster_b, layer_name="", selecte
     cluster_b_count = sort_dict(dict(Counter([str(num) for num in cluster_b])))
     cluster_b_label = list(cluster_b_count.keys())
     
-    cluster_dict = {}
-    for channel_a in cluster_a_label:
-        cluster_dict[channel_a] = {}
-        for channel_b in cluster_b_label:
-            cluster_dict[channel_a][channel_b] = {}
-            
-            Z = n_samples*cluster_a_count[channel_a]*cluster_b_count[channel_b]
-            indexes_a = list(np.where(cluster_a == int(channel_a))[0])
-            indexes_b = list(np.where(cluster_b == int(channel_b))[0])
-            indexes_ab = np.array(tuple(itertools.product(list(range(n_samples)), indexes_a, indexes_b)))
-            
-            values = iou_ab[indexes_ab[:, 0], indexes_ab[:, 1], indexes_ab[:, 2]]
-            
-            cluster_dict[channel_a][channel_b]["correlation"] = values.sum()*1.0/Z
-            
-            all_index = indexes_ab[:, 0].copy()
-            indexes_samples = values > 0.0
-            used_samples = np.unique(all_index[indexes_samples]).tolist()
-            
-            cluster_dict[channel_a][channel_b]["samples"] = used_samples
-            
-            cluster_dict[channel_a][channel_b]["samples_sum"] = values.sum()
-            cluster_dict[channel_a][channel_b]["Z"] = Z
+    indexes_a = list(np.where(cluster_a == int(channel_a))[0])
+    indexes_b = list(np.where(cluster_b == int(channel_b))[0])
     
-    result_data = []
+    Z = n_samples*cluster_a_count[channel_a]*cluster_b_count[channel_b]
     
-    for channel_a in cluster_a_label:
-        for channel_b in cluster_b_label:
-            new_data = {}
-            new_data["layer_name"] = layer_name
-            new_data["source"] = int(channel_a)
-            new_data["source_count"] = cluster_a_count[channel_a]
-            new_data["target"] = int(channel_b)
-            new_data["target_count"] = cluster_b_count[channel_b]
-            new_data["correlation"] = cluster_dict[channel_a][channel_b]["correlation"]
-            new_data["samples"] = cluster_dict[channel_a][channel_b]["samples"]
-            new_data["samples_used"] = len(cluster_dict[channel_a][channel_b]["samples"])
-            new_data["samples_sum"] = cluster_dict[channel_a][channel_b]["samples_sum"]
-            new_data["Z"] = cluster_dict[channel_a][channel_b]["Z"]
-            
-            result_data.append(new_data)
+    indexes_samples = np.array(tuple(itertools.product(indexes_a, indexes_b)))
+    samples_used = iou_ab[:, indexes_samples[:, 0], indexes_samples[:, 1]]
+    samples_sum = samples_used.sum(axis=1)*1.0/Z
+
+    indexes_ab = np.array(tuple(itertools.product(list(range(n_samples)), indexes_a, indexes_b)))    
+    total_channels = iou_ab[indexes_ab[:, 0], indexes_ab[:, 1], indexes_ab[:, 2]]
+    total_sum = total_channels.sum()*1.0/Z
+
+    new_data = {}
+    new_data["layer_name"] = layer_name
+    new_data["source"] = int(channel_a)
+    new_data["source_count"] = cluster_a_count[channel_a]
+    new_data["target"] = int(channel_b)
+    new_data["target_count"] = cluster_b_count[channel_b]
+    new_data["correlation"] = total_sum
+    new_data["samples_total_sum"] = total_sum*Z
+    new_data["samples_used"] = n_samples
+    new_data["samples_correlation"] = samples_sum.tolist()
+    new_data["Z"] = Z
     
-    return result_data
+    return new_data
 
 @app.route('/link_score', methods=['GET','POST'])
 def link_score():
-    pass
-#
-
+    selected_ids = None
+    channel_a = "0"
+    channel_b = "0"
+    if request.method == 'POST':
+        try:
+            selected_ids =  request.get_json()["selected_ids"]
+            channel_a =  request.get_json()["channel_a"]
+            channel_b =  request.get_json()["channel_b"]
+            layer_name = request.get_json()["layer_name"]
+            print("Selected samples", selected_ids, channel_a, channel_b, layer_name)
+        except Exception as e:
+            print("ERROR", e)
+    
+    if selected_ids is not None:
+        iou_ab = iou_matrix[selected_ids].copy()
+    else:
+        iou_ab = iou_matrix.copy()
+        selected_ids = list(range(iou_ab.shape[0]))
+        
+    new_data = link_channel_correlation(iou_ab, channel_a, channel_b, S_2_cluster, S_3_cluster, layer_name=layer_name)
+    new_data["samples"] = selected_ids
+    
+    return flask.jsonify(new_data)
+    
 '''
 Given a layer (of your choosing), perform max-pooling over space, giving a vector of activations over channels for each sample. Perform UMAP to compute a 2D projection.
 '''
@@ -297,6 +297,32 @@ def channel_dr():
 '''
 Compute correlation strength over selected instances, those brushed by the user.
 '''
+def channel_correlation(iou_matrix, cluster_a, cluster_b, layer_name="", selected_ids=None):
+    if selected_ids is not None:
+        iou_ab = iou_matrix[selected_ids].copy()
+    else:
+        iou_ab = iou_matrix.copy()
+        selected_ids = list(range(iou_ab.shape[0]))
+
+    cluster_a_count = sort_dict(dict(Counter([str(num) for num in cluster_a])))
+    cluster_a_label = list(cluster_a_count.keys())
+    
+    cluster_b_count = sort_dict(dict(Counter([str(num) for num in cluster_b])))
+    cluster_b_label = list(cluster_b_count.keys())
+
+    result_data = []
+    
+    for channel_a in cluster_a_label:
+        for channel_b in cluster_b_label:
+            
+            new_data = link_channel_correlation(iou_ab, channel_a, channel_b, cluster_a, cluster_b, layer_name=layer_name)
+            
+            new_data["samples"] = selected_ids
+            
+            result_data.append(new_data)
+    
+    return result_data
+
 @app.route('/selected_correlation', methods=['GET','POST'])
 def selected_correlation():
     selected_ids = None
@@ -338,10 +364,21 @@ def get_image_path():
     
     return flask.jsonify(data_dict["images"])
 
-@app.route('/get_image_url', methods=['GET'])
+@app.route('/get_image_url', methods=['GET', 'POST'])
 def get_image_url():
 
-    img_url = [  f"http://localhost:8080/static/{img.split('/')[-1]}" for img in  data_dict["images"] ]
+    selected_ids = None
+    if request.method == 'POST':
+        try:
+            selected_ids =  request.get_json()["selected_ids"]
+            print("Selected samples", selected_ids)
+        except Exception as e:
+            print("ERROR", e)
+    
+    if selected_ids is not None:
+        img_url = [img_url_data[i] for i in selected_ids]
+    else:
+        img_url = img_url_data.copy() 
     
     return flask.jsonify(img_url)
 
