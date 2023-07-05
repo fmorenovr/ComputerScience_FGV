@@ -14,6 +14,7 @@ from sklearn.cluster import SpectralClustering
 from sklearn.decomposition import PCA
 from scipy.sparse import csgraph
 from sklearn.neighbors import radius_neighbors_graph, kneighbors_graph
+from skimage.measure import block_reduce
 
 from collections import Counter, OrderedDict
 
@@ -254,14 +255,28 @@ def get_layer_clustering(layer_num):
 def get_layer_activation(layer_num):
     return data_dict[f"act{layer_num}"]
 
+def apply_max_pooling(images, pool_size=(2, 2)):
+    pool_images = []
+    for img in images:
+        #pooled_img = np.array([maximum_filter(ch, size=pool_size) for ch in img])
+        #pooled_img = maximum_filter(img, size=pool_size)
+        pooled_img = np.array([block_reduce(channel, pool_size, np.max) for channel in img])
+        #pooled_img = np.max(img, axis=(1, 2))
+        pool_images.append(pooled_img)
+    return np.array(pool_images)
+
 def get_2D_projection(layer_num):
     layer_activations = get_layer_activation(layer_num)
+    print("Layer activation:", layer_activations.shape)
     # Max pooling
-    max_pooled_activations = np.max(layer_activations, axis=(2, 3))
+    #max_pooled_activations = np.max(layer_activations, axis=(2, 3))
+    max_pooled_activations = apply_max_pooling(layer_activations, pool_size)
+    flattened_images = max_pooled_activations.reshape(max_pooled_activations.shape[0], -1)
+    print("after Pooling Layer activation:", max_pooled_activations.shape, flattened_images.shape)
     
     # Standardize the pooled activations
     scaler = StandardScaler()
-    scaled_activations = scaler.fit_transform(max_pooled_activations)
+    scaled_activations = scaler.fit_transform(flattened_images)
     
     # Perform PCA for dimensionality reduction
     #pca = PCA(n_components=50)  # Adjust the number of components as needed
