@@ -84,7 +84,7 @@ def get_image_information():
     
     return flask.jsonify(img_info)
 
-@app.route('/get_image_label', methods=['GET', 'POST'])
+@app.route('/get_image_label/', methods=['GET', 'POST'])
 def get_image_label():
 
     selected_ids = None
@@ -93,7 +93,7 @@ def get_image_label():
             selected_ids =  request.get_json()["selected_ids"]
             print("Selected samples", selected_ids)
         except Exception as e:
-            print("ERROR", e)
+            print("ERROR Images label", e)
     
     if selected_ids is not None:
         label_list = [i for i in selected_ids]
@@ -103,7 +103,7 @@ def get_image_label():
     
     return flask.jsonify(img_label)
 
-@app.route('/get_image_score', methods=['GET', 'POST'])
+@app.route('/get_image_score/', methods=['GET', 'POST'])
 def get_image_score():
 
     selected_ids = None
@@ -112,7 +112,7 @@ def get_image_score():
             selected_ids =  request.get_json()["selected_ids"]
             print("Selected samples", selected_ids)
         except Exception as e:
-            print("ERROR", e)
+            print("ERROR Images Score", e)
     
     if selected_ids is not None:
         label_list = [i for i in selected_ids]
@@ -132,26 +132,23 @@ def get_image_url(current_city):
 
     selected_ids = None
 
-    if request.method == 'GET':
+    if request.method == 'POST':
+        try:
+            selected_ids =  request.get_json()["selected_ids"]
+            if len(selected_ids)==0:
+                selected_ids = None
+            print("Selected samples to show", len(selected_ids))
+        except Exception as e:
+            print("ERROR Images URL", e)
+          
+    if selected_ids is not None:
+        img_url = [img_url_data[i] for i in selected_ids]
+    else:
         if current_city!="all" and current_city is not None:
             img_url = [img for img in img_url_data if current_city in img].copy()
         else:
             img_url = img_url_data.copy()
-
-    if request.method == 'POST':
-        try:
-            selected_ids =  request.get_json()["selected_ids"]
-            print("Selected samples", selected_ids)
-            if selected_ids is not None:
-                img_url = [img_url_data[i] for i in selected_ids]
-            else:
-                if current_city!="all" and current_city is not None:
-                    img_url = [img for img in img_url_data if current_city in img].copy()
-                else:
-                    img_url = img_url_data.copy()
-        except Exception as e:
-            print("ERROR", e)
-
+    
     return flask.jsonify(img_url)
 
 @app.route('/image/<img_name>/', methods=['GET'])
@@ -164,7 +161,7 @@ def get_image(img_name, city="Rio De Janeiro"):
         name_file = f"images/{city}/{current_image}"
         print("IMAGE:", name_file)
     except Exception as e:
-        print("ERROR", e)
+        print("ERROR City Images", e)
 
     return redirect(url_for("static", filename=name_file))
 
@@ -247,28 +244,36 @@ def get_pca_2D_projection(images, type_data="features"):
     projection = pca_images.tolist()
     return projection
 
-@app.route('/clustering/<type_cluster>/', methods=['GET','POST'])
-def get_clusters(type_cluster="umap", current_city="Boston"):
+@app.route('/clustering/<type_cluster>/<current_city>/', methods=['GET','POST'])
+def get_clusters(current_city, type_cluster):
 
     current_feature = "features"
-    current_city = None
+    selected_ids = None
 
     if request.method == 'POST':
         try:
-            current_city =  request.get_json()["city"]
             current_feature =  request.get_json()["features"]
+            selected_ids =  request.get_json()["selected_ids"]
+            if len(selected_ids)==0:
+                selected_ids = None
+            print("Selected samples to cluster", len(selected_ids))
         except Exception as e:
-            print("ERROR", e)
-        
-    if current_city!="all" and current_city is not None:
-        indexes = [index for index, img in enumerate(img_url_data) if current_city in img].copy()
+            print("ERROR Clustering", e)
+    
+    if selected_ids is not None:
+        projection_indexes = [i_ for i_ in selected_ids]
     else:
-        indexes = list(range(len(img_url_data))).copy()
+        if current_city!="all" and current_city is not None:
+            projection_indexes = [index for index, img in enumerate(img_url_data) if current_city in img].copy()
+        else:
+            projection_indexes = list(range(len(img_url_data))).copy()
+    
+    new_projections = clustering_dict[f"{current_feature}_{type_cluster}_clustering"].copy()
+    current_projection = [ new_projections[i] for i in projection_indexes].copy()
+    
+    projection = [ {"pc0": proj[0], "pc1": proj[1], "index": new_} for _, (proj, new_) in enumerate(zip(current_projection, projection_indexes))]
 
-    current_projection = clustering_dict[f"{current_feature}_{type_cluster}_clustering"].copy()
-    projection = [ proj for index, proj in enumerate(current_projection) if index in indexes ]
-
-    return flask.jsonify({"projection": projection})
+    return flask.jsonify({"cluster_data": projection})
 
 '''
 In the main, before running the server, run clustering, store results in variables a2_clustering, a3_clustering, a4_clustering
@@ -285,7 +290,7 @@ if __name__=='__main__':
 
     print("Clustering t-SNE ...")
     #clustering_dict["images_tsne_clustering"] = get_tsne_2D_projection(images, type_data="images")
-    clustering_dict["features_tsne_clustering"] = get_pca_2D_projection(features, type_data="features")
+    clustering_dict["features_tsne_clustering"] = get_tsne_2D_projection(features, type_data="features")
     
     print("Initializing server ...")
     app.run(port=PORT, use_reloader=False, threaded=True)
