@@ -107,7 +107,7 @@ def get_image_label():
 
 
 @app.route('/get_image_prediction/', methods=['GET', 'POST'])
-def get_image_label():
+def get_image_prediction():
 
     selected_ids = None
     if request.method == 'POST':
