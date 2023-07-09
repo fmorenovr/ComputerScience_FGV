@@ -335,11 +335,11 @@ def get_importances_regression(current_city):
 
     if request.method == 'POST':
         try:
-            selected_ids =  request.get_json()["type_norm"]
+            type_norm =  request.get_json()["type_norm"]
             selected_ids =  request.get_json()["selected_ids"]
             if len(selected_ids)==0:
                 selected_ids = None
-            print("Selected samples to get importance", len(selected_ids))
+            print("Selected samples to get importance", len(selected_ids), type_norm)
         except Exception as e:
             print("ERROR Importance", e)
     
