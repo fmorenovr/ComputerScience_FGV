@@ -54,6 +54,7 @@ latitude = data_dict["latitude"].copy()
 longitude = data_dict["longitude"].copy()
 labels = data_dict["label"].copy()
 scores = data_dict["safety"].copy()
+predictions = data_dict["predictions"].copy()
 
 img_url_data = [  f"http://localhost:{PORT}/static/images/{img.split('/')[-2]}/{img.split('/')[-1]}" for img in  data_dict["path"] ]
 
@@ -80,7 +81,7 @@ def get_image_information():
         except Exception as e:
             print("ERROR", e)
 
-    img_info = [ {"id": index,"city": cit, "lat": lat, "long": long_, "label": lab, "score": scor} for index, (cit, lat, long_, lab, scor) in enumerate(zip(cities, latitude, longitude, labels, scores)) ]
+    img_info = [ {"id": index,"city": cit, "lat": lat, "long": long_, "label": lab, "score": scor, "prediction": pred} for index, (cit, lat, long_, lab, scor, pred) in enumerate(zip(cities, latitude, longitude, labels, scores, predictions)) ]
     
     return flask.jsonify(img_info)
 
@@ -102,6 +103,27 @@ def get_image_label():
         img_label = labels.copy() 
     
     return flask.jsonify(img_label)
+
+
+
+@app.route('/get_image_prediction/', methods=['GET', 'POST'])
+def get_image_label():
+
+    selected_ids = None
+    if request.method == 'POST':
+        try:
+            selected_ids =  request.get_json()["selected_ids"]
+            print("Selected samples", selected_ids)
+        except Exception as e:
+            print("ERROR Images label", e)
+    
+    if selected_ids is not None:
+        label_list = [i for i in selected_ids]
+        img_score = predictions[label_list]
+    else:
+        img_score = predictions.copy() 
+    
+    return flask.jsonify(img_score)
 
 @app.route('/get_image_score/', methods=['GET', 'POST'])
 def get_image_score():
