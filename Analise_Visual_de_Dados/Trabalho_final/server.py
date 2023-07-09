@@ -45,7 +45,7 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 CORS(app)
 
 # load all of the data generated from preprocessing
-data_dict = joblib.load(f"{absolute_current_path}/outputs/static/data_test.joblib")
+data_dict = joblib.load(f"{absolute_current_path}/outputs/static/data_server.joblib")
 data_dict["images"] = []
 images = np.array(data_dict["images"]).copy()
 features = np.array(data_dict["features"]).copy()
