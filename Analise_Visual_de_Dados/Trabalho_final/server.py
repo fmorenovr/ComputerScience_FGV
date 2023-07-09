@@ -54,7 +54,7 @@ latitude = data_dict["latitude"].copy()
 longitude = data_dict["longitude"].copy()
 labels = data_dict["label"].copy()
 scores = data_dict["safety"].copy()
-predictions = data_dict["predictions"].copy()
+predictions = data_dict["prediction"].copy()
 
 img_url_data = [  f"http://localhost:{PORT}/static/images/{img.split('/')[-2]}/{img.split('/')[-1]}" for img in  data_dict["path"] ]
 
