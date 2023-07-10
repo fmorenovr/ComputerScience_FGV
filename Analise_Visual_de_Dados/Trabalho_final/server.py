@@ -60,6 +60,7 @@ labels = data_dict["label"].copy()
 scores = data_dict["safety"].copy()
 predictions = data_dict["prediction"].copy()
 regressor_model = copy.deepcopy(data_dict["model"])
+importances = data_dict["importances"].copy()
 
 img_url_data = [  f"http://localhost:{PORT}/static/images/{img.split('/')[-2]}/{img.split('/')[-1]}" for img in  data_dict["path"] ]
 
@@ -75,8 +76,8 @@ def add_header(r):
     return r
 
 # IMAGES
-@app.route('/get_image_information/', methods=['GET', 'POST'])
-def get_image_information():
+@app.route('/get_image_information/<current_city>/', methods=['GET', 'POST'])
+def get_image_information(current_city):
 
     selected_ids = None
     if request.method == 'POST':
@@ -85,9 +86,12 @@ def get_image_information():
             print("Selected samples", selected_ids)
         except Exception as e:
             print("ERROR", e)
+            
+    if current_city!="all" and current_city is not None:
+        img_info = [ {"id": index,"city": cit, "lat": lat, "long": long_, "label": lab, "score": scor, "prediction": pred} for index, (cit, lat, long_, lab, scor, pred) in enumerate(zip(cities, latitude, longitude, labels, scores, predictions)) if cit==current_city]
+    else:
+        img_info = [ {"id": index,"city": cit, "lat": lat, "long": long_, "label": lab, "score": scor, "prediction": pred} for index, (cit, lat, long_, lab, scor, pred) in enumerate(zip(cities, latitude, longitude, labels, scores, predictions)) ]
 
-    img_info = [ {"id": index,"city": cit, "lat": lat, "long": long_, "label": lab, "score": scor, "prediction": pred} for index, (cit, lat, long_, lab, scor, pred) in enumerate(zip(cities, latitude, longitude, labels, scores, predictions)) ]
-    
     return flask.jsonify(img_info)
 
 @app.route('/get_image_label/', methods=['GET', 'POST'])
@@ -108,8 +112,6 @@ def get_image_label():
         img_label = labels.copy() 
     
     return flask.jsonify(img_label)
-
-
 
 @app.route('/get_image_prediction/', methods=['GET', 'POST'])
 def get_image_prediction():
@@ -167,7 +169,7 @@ def get_image_url(current_city):
             print("Selected samples to show", len(selected_ids))
         except Exception as e:
             print("ERROR Images URL", e)
-          
+    
     if selected_ids is not None:
         img_url = [img_url_data[i] for i in selected_ids]
     else:
@@ -343,21 +345,25 @@ def get_importances_regression(current_city):
         except Exception as e:
             print("ERROR Importance", e)
     
-    if selected_ids is not None:
-        sample_indexes = [i_ for i_ in selected_ids]
+    if current_city=="all":
+        temp_result = importances.copy()
+        result = [ {"feature_name": key, "importance": value, "std": 0} for key, value in temp_result.items() ]
     else:
-        if current_city!="all" and current_city is not None:
-            sample_indexes = [index for index, img in enumerate(img_url_data) if current_city in img].copy()
+        if selected_ids is not None:
+            sample_indexes = [i_ for i_ in selected_ids]
         else:
-            sample_indexes = list(range(len(img_url_data))).copy()
-            
-    current_samples = [ features[i] for i in sample_indexes].copy()
-    current_outputs = [ scores[i] for i in sample_indexes].copy()
-    
-    importance_name, importance_mean, importances_std = get_feature_importance_regression(regressor_model, current_samples, current_outputs)
-    importance_vector = normalize_vector(importance_mean, type_norm=type_norm)
-    
-    result = [{"feature_name": name, "importance": value, "std": std_} for (name, value, std_) in zip(importance_name, importance_vector, importances_std)]
+            if current_city!="all" and current_city is not None:
+                sample_indexes = [index for index, img in enumerate(img_url_data) if current_city in img].copy()
+            else:
+                sample_indexes = list(range(len(img_url_data))).copy()
+                
+        current_samples = [ features[i] for i in sample_indexes].copy()
+        current_outputs = [ scores[i] for i in sample_indexes].copy()
+        
+        importance_name, importance_mean, importances_std = get_feature_importance_regression(regressor_model, current_samples, current_outputs)
+        importance_vector = normalize_vector(importance_mean, type_norm=type_norm)
+        
+        result = [{"feature_name": name, "importance": value, "std": std_} for (name, value, std_) in zip(importance_name, importance_vector, importances_std)]
     
     sorted_result = sorted(result, key=lambda x: x['feature_name'].upper())
     
