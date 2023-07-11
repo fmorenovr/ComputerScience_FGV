@@ -345,7 +345,7 @@ def get_importances_regression(current_city):
         except Exception as e:
             print("ERROR Importance", e)
     
-    if current_city=="all":
+    if current_city=="all" and selected_ids is None:
         temp_result = importances.copy()
         result = [ {"feature_name": key, "importance": value, "std": 0} for key, value in temp_result.items() ]
     else:
@@ -360,10 +360,15 @@ def get_importances_regression(current_city):
         current_samples = [ features[i] for i in sample_indexes].copy()
         current_outputs = [ scores[i] for i in sample_indexes].copy()
         
-        importance_name, importance_mean, importances_std = get_feature_importance_regression(regressor_model, current_samples, current_outputs)
-        importance_vector = normalize_vector(importance_mean, type_norm=type_norm)
+        try:
+            importance_name, importance_mean, importances_std = get_feature_importance_regression(regressor_model, current_samples, current_outputs)
+            importance_vector = normalize_vector(importance_mean, type_norm=type_norm)
         
-        result = [{"feature_name": name, "importance": value, "std": std_} for (name, value, std_) in zip(importance_name, importance_vector, importances_std)]
+            result = [{"feature_name": name, "importance": value, "std": std_} for (name, value, std_) in zip(importance_name, importance_vector, importances_std)]
+        except Exception as e:
+            print("ERROR Importance", e)
+            temp_result = importances.copy()
+            result = [ {"feature_name": key, "importance": value, "std": 0} for key, value in temp_result.items() ]
     
     sorted_result = sorted(result, key=lambda x: x['feature_name'].upper())
     
