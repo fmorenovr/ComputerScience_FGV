@@ -8,11 +8,11 @@ Cursos realizados para obter o grau de **Doutor em Ciência da Computação**, o
     
     707007 – Estadística Computacional
     707010 – Sistemas Dinâmicos Aplicados
-    707076 – Machine Learning I
+    707076 – Fundamentos de Aprendizado de Máquina  
 
 ## Periodo 2022-II:
     
-    707011 – Redes Neurais e Deep Learning
+    707011 – Redes Neurais e Aprendizado Profundo
     707052 – Ciência de Redes
     707075 – Métodos e Técnicas de Pesquisa
 
